@@ -13,3 +13,5 @@ clean-targets:
 models:
   pipeline:
     +materialized: table
+    bronze:
+      +schema: bronze
