@@ -1,1 +1,5 @@
-[]
+[
+  {"id": 1, "name": "Alice", "value": 42.1},
+  {"id": 2, "name": "Bob",   "value": 17.5},
+  {"id": 3, "name": "Carol", "value": 99.9}
+]
