@@ -1,0 +1,7 @@
+pipeline:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ../pipeline.duckdb
+      schema: main

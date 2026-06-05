@@ -1,3 +1,7 @@
 .mcp
 .claude
 docs
+pipeline/venv/
+pipeline/dbt/target/
+pipeline/dbt/dbt_packages/
+pipeline/pipeline.duckdb
