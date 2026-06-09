@@ -3,6 +3,7 @@ import sys
 
 import anthropic
 
+from agent.git_handler import open_pr
 from agent.sandbox import run_sandbox_loop
 from agent.tools import TOOLS, dispatch
 
@@ -74,6 +75,9 @@ def run():
             print("[diagnose] handing off to sandbox")
             result = run_sandbox_loop(fix_text, error_entry, messages)
             print(result)
+            if result["status"] == "success":
+                pr_url = open_pr(result, error_entry, messages)
+                print(f"[diagnose] PR opened: {pr_url}")
             break
 
         tool_results = []
