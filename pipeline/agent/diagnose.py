@@ -4,6 +4,7 @@ import sys
 import anthropic
 
 from agent.git_handler import open_pr
+from agent.notify import send_notification
 from agent.sandbox import run_sandbox_loop
 from agent.tools import TOOLS, dispatch
 
@@ -12,10 +13,11 @@ MODEL = "claude-haiku-4-5"
 MAX_TOKENS = 4096
 MAX_TOOL_CALLS = 10
 SYSTEM_PROMPT = (
-    "You are a dbt pipeline debugger. You have received an error message from a failed dbt run. "
-    "Your job is to identify the root cause and propose a fix. "
-    "Focus only on files directly relevant to the error. Do not explore the entire codebase. "
-    "Stop as soon as you have enough information to propose a fix."
+    "You are a dbt pipeline debugger. You have received a structured error log entry from a failed dbt run. "
+    "The error message and details tell you exactly which model failed and why. "
+    "Your first action must be to read the specific file mentioned in the error. "
+    "Do not list directories. Go directly to the file. Read it, identify the problem, and propose a fix. "
+    "Stop as soon as you have enough information."
 )
 
 
@@ -78,6 +80,9 @@ def run():
             if result["status"] == "success":
                 pr_url = open_pr(result, error_entry, messages)
                 print(f"[diagnose] PR opened: {pr_url}")
+                send_notification(result, pr_url)
+            else:
+                send_notification(result)
             break
 
         tool_results = []

@@ -1,0 +1,5 @@
+smtp_host: smtp.gmail.com
+smtp_port: 587
+from: alex12060309@gmail.com
+to: alex12060309@gmail.com
+password: env
