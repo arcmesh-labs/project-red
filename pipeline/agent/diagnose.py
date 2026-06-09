@@ -3,11 +3,19 @@ import sys
 
 import anthropic
 
+from agent.sandbox import run_sandbox_loop
 from agent.tools import TOOLS, dispatch
 
 LOG_FILE = "logs/pipeline.log"
 MODEL = "claude-haiku-4-5"
 MAX_TOKENS = 4096
+MAX_TOOL_CALLS = 10
+SYSTEM_PROMPT = (
+    "You are a dbt pipeline debugger. You have received an error message from a failed dbt run. "
+    "Your job is to identify the root cause and propose a fix. "
+    "Focus only on files directly relevant to the error. Do not explore the entire codebase. "
+    "Stop as soon as you have enough information to propose a fix."
+)
 
 
 def find_last_error() -> dict:
@@ -44,10 +52,13 @@ def run():
     client = anthropic.Anthropic()
     messages = [{"role": "user", "content": initial_message}]
 
+    print("[diagnose] starting tool-use loop")
+    tool_call_count = 0
     while True:
         response = client.messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
+            system=SYSTEM_PROMPT,
             tools=TOOLS,
             messages=messages,
         )
@@ -55,15 +66,22 @@ def run():
         messages.append({"role": "assistant", "content": response.content})
 
         if response.stop_reason == "end_turn":
+            fix_text = ""
             for block in response.content:
                 if hasattr(block, "text"):
+                    fix_text += block.text
                     print(block.text)
+            print("[diagnose] handing off to sandbox")
+            result = run_sandbox_loop(fix_text, error_entry, messages)
+            print(result)
             break
 
         tool_results = []
         for block in response.content:
             if block.type != "tool_use":
                 continue
+            tool_call_count += 1
+            print(f"[diagnose] tool: {block.name}")
             try:
                 output = dispatch(block.name, block.input)
                 is_error = False
@@ -78,6 +96,10 @@ def run():
             })
 
         messages.append({"role": "user", "content": tool_results})
+
+        if tool_call_count >= MAX_TOOL_CALLS:
+            print(f"[diagnose] reached max tool calls ({MAX_TOOL_CALLS}), stopping")
+            break
 
 
 if __name__ == "__main__":
