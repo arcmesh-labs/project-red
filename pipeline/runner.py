@@ -4,9 +4,12 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
+import yaml
+
 LOGS_DIR = "logs"
 LOG_FILE = os.path.join(LOGS_DIR, "pipeline.log")
 DBT_DIR = "dbt"
+LLM_CONFIG = "config/llm.yml"
 
 
 def _now():
@@ -24,12 +27,26 @@ def _write_log(source, status, message, details=None):
     }
     with open(LOG_FILE, "a") as f:
         f.write(json.dumps(entry) + "\n")
+    return entry
+
+
+# STUB: replace with real System 3 integration in phase 3
+def notify_llm(entry):
+    print(f"LLM routing: {entry}")
+
+
+def _maybe_route_to_llm(entry):
+    with open(LLM_CONFIG) as f:
+        cfg = yaml.safe_load(f)
+    if cfg.get("active"):
+        notify_llm(entry)
 
 
 try:
     import loader
 except Exception as e:
-    _write_log("loader", "error", "Loader failed", str(e))
+    entry = _write_log("loader", "error", "Loader failed", str(e))
+    _maybe_route_to_llm(entry)
     sys.exit(1)
 
 _write_log("loader", "ok", "Loader completed successfully")
@@ -43,7 +60,8 @@ try:
         text=True,
     )
 except subprocess.CalledProcessError as e:
-    _write_log("dbt_run", "error", "dbt run failed", e.stderr)
+    entry = _write_log("dbt_run", "error", "dbt run failed", e.stderr)
+    _maybe_route_to_llm(entry)
     sys.exit(1)
 
 _write_log("dbt_run", "ok", "dbt run completed successfully")
@@ -57,7 +75,8 @@ try:
         text=True,
     )
 except subprocess.CalledProcessError as e:
-    _write_log("dbt_test", "error", "dbt test failed", e.stderr)
+    entry = _write_log("dbt_test", "error", "dbt test failed", e.stderr)
+    _maybe_route_to_llm(entry)
     sys.exit(1)
 
 _write_log("dbt_test", "ok", "dbt test completed successfully")
