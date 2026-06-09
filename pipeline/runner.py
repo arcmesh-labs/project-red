@@ -60,7 +60,7 @@ try:
         text=True,
     )
 except subprocess.CalledProcessError as e:
-    entry = _write_log("dbt_run", "error", "dbt run failed", e.stderr)
+    entry = _write_log("dbt_run", "error", "dbt run failed", e.stdout or e.stderr)
     _maybe_route_to_llm(entry)
     sys.exit(1)
 
@@ -75,7 +75,7 @@ try:
         text=True,
     )
 except subprocess.CalledProcessError as e:
-    entry = _write_log("dbt_test", "error", "dbt test failed", e.stderr)
+    entry = _write_log("dbt_test", "error", "dbt test failed", e.stdout or e.stderr)
     _maybe_route_to_llm(entry)
     sys.exit(1)
 
