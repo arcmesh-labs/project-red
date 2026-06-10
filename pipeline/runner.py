@@ -5,6 +5,9 @@ import sys
 from datetime import datetime, timezone
 
 import yaml
+from dotenv import load_dotenv
+
+load_dotenv()
 
 LOGS_DIR = "logs"
 LOG_FILE = os.path.join(LOGS_DIR, "pipeline.log")
@@ -30,16 +33,12 @@ def _write_log(source, status, message, details=None):
     return entry
 
 
-# STUB: replace with real System 3 integration in phase 3
-def notify_llm(entry):
-    print(f"LLM routing: {entry}")
-
-
 def _maybe_route_to_llm(entry):
     with open(LLM_CONFIG) as f:
         cfg = yaml.safe_load(f)
     if cfg.get("active"):
-        notify_llm(entry)
+        import agent.diagnose
+        agent.diagnose.run()
 
 
 try:

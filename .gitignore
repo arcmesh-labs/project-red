@@ -7,3 +7,4 @@ pipeline/dbt/dbt_packages/
 pipeline/pipeline.duckdb
 pipeline/dbt/logs/
 pipeline/dbt/.user.yml
+pipeline/.env
