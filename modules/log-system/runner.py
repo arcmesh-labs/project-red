@@ -7,12 +7,13 @@ from datetime import datetime, timezone
 import yaml
 from dotenv import load_dotenv
 
-load_dotenv()
+_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
+load_dotenv(os.path.join(_ROOT, ".env"))
 
-LOGS_DIR = "logs"
+LOGS_DIR = os.path.join(_ROOT, "logs")
 LOG_FILE = os.path.join(LOGS_DIR, "pipeline.log")
-DBT_DIR = "dbt"
-LLM_CONFIG = "config/llm.yml"
+DBT_DIR = os.path.join(_ROOT, "modules/pipeline/dbt")
+LLM_CONFIG = os.path.join(_ROOT, "config/llm.yml")
 
 
 def _now():
@@ -38,10 +39,12 @@ def _maybe_route_to_llm(entry):
         cfg = yaml.safe_load(f)
     if cfg.get("active"):
         print("[runner] routing to agent...")
+        sys.path.insert(0, os.path.join(_ROOT, "modules/llm-system"))
         import agent.diagnose
         agent.diagnose.run()
 
 
+sys.path.insert(0, os.path.join(_ROOT, "modules/pipeline"))
 print("[runner] starting loader...")
 try:
     import loader

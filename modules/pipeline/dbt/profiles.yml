@@ -3,5 +3,5 @@ pipeline:
   outputs:
     dev:
       type: duckdb
-      path: ../pipeline.duckdb
+      path:  ../../../data/pipeline.duckdb
       schema: main

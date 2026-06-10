@@ -3,6 +3,8 @@ import os
 import duckdb
 import yaml
 
+_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.."))
+
 TOOLS = [
     {
         "name": "list_directory",
@@ -53,9 +55,9 @@ def _read_file(path: str) -> str:
 def _query_duckdb(sql: str) -> str:
     if not sql.strip().upper().startswith("SELECT"):
         raise ValueError("Only SELECT statements are allowed.")
-    with open("config/duckdb.yml") as f:
+    with open(os.path.join(_ROOT, "config/duckdb.yml")) as f:
         db_cfg = yaml.safe_load(f)
-    con = duckdb.connect(db_cfg["database"], read_only=True)
+    con = duckdb.connect(os.path.join(_ROOT, db_cfg["database"]), read_only=True)
     try:
         result = con.execute(sql).df()
     finally:

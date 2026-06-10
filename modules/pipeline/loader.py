@@ -1,11 +1,16 @@
-import yaml
+import os
+
 import duckdb
+import yaml
+
 from source import fetch
 
-with open("config/duckdb.yml") as f:
+_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
+
+with open(os.path.join(_ROOT, "config/duckdb.yml")) as f:
     db_cfg = yaml.safe_load(f)
 
-db_path = db_cfg["database"]
+db_path = os.path.join(_ROOT, db_cfg["database"])
 raw_schema = db_cfg["schemas"]["raw"]
 
 result = fetch()

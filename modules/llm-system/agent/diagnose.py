@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 
 import anthropic
@@ -8,7 +9,8 @@ from agent.notify import send_notification
 from agent.sandbox import run_sandbox_loop
 from agent.tools import TOOLS, dispatch
 
-LOG_FILE = "logs/pipeline.log"
+_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.."))
+LOG_FILE = os.path.join(_ROOT, "logs/pipeline.log")
 MODEL = "claude-haiku-4-5"
 MAX_TOKENS = 4096
 MAX_TOOL_CALLS = 10

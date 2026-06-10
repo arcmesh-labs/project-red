@@ -7,6 +7,7 @@ import anthropic
 import yaml
 from github import Github, GithubException
 
+_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.."))
 MODEL = "claude-haiku-4-5"
 MAX_TOKENS = 4096
 
@@ -17,12 +18,14 @@ def _strip_ansi(text: str) -> str:
 
 def _read_model_files():
     files = {}
-    for root, _, filenames in os.walk("dbt/models"):
+    models_dir = os.path.join(_ROOT, "modules/pipeline/dbt/models")
+    for root, _, filenames in os.walk(models_dir):
         for filename in filenames:
             full_path = os.path.join(root, filename)
+            rel_path = os.path.relpath(full_path, _ROOT)
             try:
                 with open(full_path) as f:
-                    files[full_path] = f.read()
+                    files[rel_path] = f.read()
             except Exception:
                 pass
     return files
@@ -52,7 +55,7 @@ def _determine_changed_files(fix_suggestion, model_files):
 
 
 def open_pr(sandbox_result, error_entry, conversation_history):
-    with open("config/github.yml") as f:
+    with open(os.path.join(_ROOT, "config/github.yml")) as f:
         gh_cfg = yaml.safe_load(f)
     owner = gh_cfg["owner"]
     repo_name = gh_cfg["repo"]
@@ -71,7 +74,7 @@ def open_pr(sandbox_result, error_entry, conversation_history):
 
     commit_message = "fix: apply dbt fix from agent"
     for entry in changed_files:
-        repo_path = f"pipeline/{entry['path']}"
+        repo_path = entry['path']
         content = entry["content"]
         try:
             existing = gh_repo.get_contents(repo_path, ref=branch_name)

@@ -6,6 +6,7 @@ import anthropic
 import duckdb
 import yaml
 
+_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.."))
 MODEL = "claude-haiku-4-5"
 MAX_TOKENS = 4096
 
@@ -96,7 +97,7 @@ def _agent_loop(client, history, tools, dispatch_fn):
 
 def _setup_sandbox(sandbox_dir, prod_db_path):
     shutil.copytree(
-        "dbt",
+        os.path.join(_ROOT, "modules/pipeline/dbt"),
         os.path.join(sandbox_dir, "dbt"),
         ignore=shutil.ignore_patterns("target", "logs", ".user.yml"),
     )
@@ -172,15 +173,15 @@ def _get_new_fix(client, history):
 
 
 def run_sandbox_loop(fix_suggestion, error_entry, conversation_history):
-    with open("config/duckdb.yml") as f:
+    with open(os.path.join(_ROOT, "config/duckdb.yml")) as f:
         db_cfg = yaml.safe_load(f)
-    prod_db_path = db_cfg["database"]
+    prod_db_path = os.path.join(_ROOT, db_cfg["database"])
 
     client = anthropic.Anthropic()
     history = list(conversation_history)
     fix_to_apply = fix_suggestion
     last_error = ""
-    sandbox_base = "sandbox"
+    sandbox_base = os.path.join(_ROOT, "sandbox")
 
     print("[sandbox] starting loop, max 5 attempts")
     try:

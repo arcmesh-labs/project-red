@@ -4,9 +4,11 @@ from email.mime.text import MIMEText
 
 import yaml
 
+_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.."))
+
 
 def send_notification(result, pr_url=None):
-    with open("config/notify.yml") as f:
+    with open(os.path.join(_ROOT, "config/notify.yml")) as f:
         cfg = yaml.safe_load(f)
 
     smtp_host = cfg["smtp_host"]
