@@ -18,9 +18,13 @@ def _strip_ansi(text: str) -> str:
 
 def _read_model_files():
     files = {}
-    models_dir = os.path.join(_ROOT, "modules/pipeline/dbt/models")
-    for root, _, filenames in os.walk(models_dir):
+    dbt_dir = os.path.join(_ROOT, "modules/pipeline/dbt")
+    exclude_dirs = {"target", "logs"}
+    for root, dirs, filenames in os.walk(dbt_dir):
+        dirs[:] = [d for d in dirs if d not in exclude_dirs]
         for filename in filenames:
+            if filename == ".user.yml":
+                continue
             full_path = os.path.join(root, filename)
             rel_path = os.path.relpath(full_path, _ROOT)
             try:
