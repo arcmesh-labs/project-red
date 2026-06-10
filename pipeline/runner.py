@@ -37,19 +37,24 @@ def _maybe_route_to_llm(entry):
     with open(LLM_CONFIG) as f:
         cfg = yaml.safe_load(f)
     if cfg.get("active"):
+        print("[runner] routing to agent...")
         import agent.diagnose
         agent.diagnose.run()
 
 
+print("[runner] starting loader...")
 try:
     import loader
 except Exception as e:
     entry = _write_log("loader", "error", "Loader failed", str(e))
+    print(f"[runner] ERROR in loader: {entry['message']}")
     _maybe_route_to_llm(entry)
     sys.exit(1)
 
 _write_log("loader", "ok", "Loader completed successfully")
+print("[runner] loader ok")
 
+print("[runner] running dbt run...")
 try:
     subprocess.run(
         ["dbt", "run", "--profiles-dir", "."],
@@ -60,11 +65,14 @@ try:
     )
 except subprocess.CalledProcessError as e:
     entry = _write_log("dbt_run", "error", "dbt run failed", e.stdout or e.stderr)
+    print(f"[runner] ERROR in dbt_run: {entry['message']}")
     _maybe_route_to_llm(entry)
     sys.exit(1)
 
 _write_log("dbt_run", "ok", "dbt run completed successfully")
+print("[runner] dbt run ok")
 
+print("[runner] running dbt test...")
 try:
     subprocess.run(
         ["dbt", "test", "--profiles-dir", "."],
@@ -75,7 +83,10 @@ try:
     )
 except subprocess.CalledProcessError as e:
     entry = _write_log("dbt_test", "error", "dbt test failed", e.stdout or e.stderr)
+    print(f"[runner] ERROR in dbt_test: {entry['message']}")
     _maybe_route_to_llm(entry)
     sys.exit(1)
 
 _write_log("dbt_test", "ok", "dbt test completed successfully")
+print("[runner] dbt test ok — pipeline complete")
+print(f"[runner] log: cat {LOG_FILE}")
