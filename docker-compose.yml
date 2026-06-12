@@ -1,0 +1,39 @@
+services:
+  pipeline:
+    build:
+      context: modules/pipeline
+    volumes:
+      - logs:/app/logs
+      - data:/app/data
+      - ./config:/app/config:ro
+    env_file: .env
+    command: ["python", "-c", "print('[pipeline] image ok')"]
+
+  llm-system:
+    build:
+      context: modules/llm-system
+    volumes:
+      - logs:/app/logs
+      - data:/app/data
+      - ./config:/app/config:ro
+    env_file: .env
+    command: ["python", "-c", "print('[llm-system] image ok')"]
+
+  log-system:
+    build:
+      context: .
+      dockerfile: modules/log-system/Dockerfile
+    volumes:
+      - logs:/app/logs
+      - data:/app/data
+      - ./config:/app/config:ro
+    env_file: .env
+    depends_on:
+      pipeline:
+        condition: service_completed_successfully
+      llm-system:
+        condition: service_completed_successfully
+
+volumes:
+  logs:
+  data:

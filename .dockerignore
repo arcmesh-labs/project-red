@@ -1,0 +1,12 @@
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+.git/
+modules/pipeline/dbt/target/
+modules/pipeline/dbt/logs/
+modules/pipeline/logs/
+logs/
+data/
+.env
+docs/
+sandbox/

@@ -1,0 +1,6 @@
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+dbt/target/
+dbt/logs/
+logs/
