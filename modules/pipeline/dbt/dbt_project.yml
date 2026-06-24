@@ -14,4 +14,3 @@ models:
   pipeline:
     +materialized: table
     bronze:
-      +schema: bronze
