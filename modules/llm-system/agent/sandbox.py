@@ -123,6 +123,26 @@ def _setup_sandbox(sandbox_dir, prod_db_path):
             sandbox_con.execute(
                 f'CREATE TABLE "{schema_name}"."{table_name}" AS SELECT * FROM _tmp'
             )
+
+        # Pre-create all schemas dbt will reference during compilation
+        dbt_project_path = os.path.join(sandbox_dir, "dbt", "dbt_project.yml")
+        with open(dbt_project_path) as f:
+            dbt_project = yaml.safe_load(f)
+        custom_schemas = set()
+        def _collect_schemas(node):
+            if isinstance(node, dict):
+                if "+schema" in node:
+                    custom_schemas.add(node["+schema"])
+                for v in node.values():
+                    _collect_schemas(v)
+        _collect_schemas(dbt_project.get("models", {}))
+        for profile_data in profiles.values():
+            for output_data in profile_data.get("outputs", {}).values():
+                base = output_data.get("schema")
+                if base:
+                    sandbox_con.execute(f'CREATE SCHEMA IF NOT EXISTS "{base}"')
+                    for cs in custom_schemas:
+                        sandbox_con.execute(f'CREATE SCHEMA IF NOT EXISTS "{base}_{cs}"')
     finally:
         prod_con.close()
         sandbox_con.close()

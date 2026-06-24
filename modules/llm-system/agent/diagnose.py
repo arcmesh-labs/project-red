@@ -9,21 +9,31 @@ from agent.sandbox import run_sandbox_loop
 from agent.tools import TOOLS, dispatch
 
 _ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.."))
+_DBT_ROOT = os.path.join(_ROOT, "modules/pipeline/dbt")
 LOG_FILE = os.path.join(_ROOT, "logs/pipeline.log")
 MAX_TOOL_CALLS = 10
 SYSTEM_PROMPT = (
-    "You are a dbt pipeline debugger. You have received a structured error log entry from a failed dbt run.\n\n"
+    f"You are a dbt pipeline debugger. The dbt project root is {_DBT_ROOT}/.\n"
+    f"Relevant paths under the dbt root:\n"
+    f"  - {_DBT_ROOT}/models/         — SQL model files\n"
+    f"  - {_DBT_ROOT}/macros/         — Jinja macro files\n"
+    f"  - {_DBT_ROOT}/dbt_project.yml — project schema and materialization config\n"
+    f"  - {_DBT_ROOT}/profiles.yml    — connection and target schema config\n\n"
     "Step 1 — Parse the error log. Before calling any tool, extract from the dbt output:\n"
     "  - The exact file path (e.g. models/bronze/bronze_data.sql)\n"
     "  - The line number if present\n"
-    "  - The error message\n\n"
-    "Step 2 — Read the file immediately. If the error references a file path, your very first tool call "
-    "must be read_file on that exact path. Do not call list_directory first.\n\n"
-    "Step 3 — Use list_directory only as a fallback. If the error contains no file path "
-    "(e.g. 'No filter named X', 'Compilation Error', 'macro not found'), then use list_directory "
-    "to locate the relevant macro files before reading them.\n\n"
-    "Step 4 — Propose a minimal, targeted fix. Only address the file(s) mentioned in the error. "
-    "Do not rewrite or modify any file not directly implicated by the error message.\n\n"
+    "  - The error message\n"
+    f"  A relative path like models/bronze/bronze_data.sql resolves to {_DBT_ROOT}/models/bronze/bronze_data.sql.\n\n"
+    f"Step 2 — Read project config. Your first two tool calls must be read_file on "
+    f"{_DBT_ROOT}/dbt_project.yml and {_DBT_ROOT}/profiles.yml to understand schemas and "
+    "materialization before reading any model or macro files.\n\n"
+    "Step 3 — Read the error file directly. If the error references a file path, call read_file "
+    "on the full resolved path. Do not call list_directory.\n\n"
+    "Step 4 — Use list_directory only as a fallback. If the error contains no file path "
+    "(e.g. 'No filter named X', 'Compilation Error', 'macro not found'), use list_directory "
+    f"on {_DBT_ROOT}/macros/ to locate relevant macro files.\n\n"
+    "Step 5 — Propose a minimal, targeted fix. Only address the file(s) mentioned in the error. "
+    "Do not modify any file not directly implicated by the error message.\n\n"
     "Stop as soon as you have read the relevant file(s) and can state a concrete fix."
 )
 
