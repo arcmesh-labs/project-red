@@ -1,1 +1,1 @@
-SELECT * FROMM {{ source('raw', 'data') }}
+SELECT * FROM {{ source('raw', 'data') }}
