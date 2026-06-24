@@ -2,30 +2,29 @@ import json
 import os
 import sys
 
-import anthropic
-
 from agent.git_handler import open_pr
+from agent.llm_client import LLMClient
 from agent.notify import send_notification
 from agent.sandbox import run_sandbox_loop
 from agent.tools import TOOLS, dispatch
 
 _ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.."))
 LOG_FILE = os.path.join(_ROOT, "logs/pipeline.log")
-MODEL = "claude-haiku-4-5"
-MAX_TOKENS = 4096
 MAX_TOOL_CALLS = 10
 SYSTEM_PROMPT = (
-    "You are a dbt pipeline debugger. You have received a structured error log entry from a failed dbt run. "
-    "There are two types of errors you may encounter:\n\n"
-    "1. Model error — the error message references a specific .sql file. "
-    "Your first action must be to read that specific file directly. "
-    "Do not list directories. Go straight to the file.\n\n"
-    "2. Compilation error or macro error — the error message does not reference a file path "
-    "(e.g. 'No filter named X', 'Compilation Error', 'macro not found'). "
-    "If the error message contains no file path, you must always start by reading the macro files "
-    "in dbt/macros/ before doing anything else.\n\n"
-    "In both cases: read the relevant file(s), identify the problem, and propose a concrete fix. "
-    "Stop as soon as you have enough information."
+    "You are a dbt pipeline debugger. You have received a structured error log entry from a failed dbt run.\n\n"
+    "Step 1 — Parse the error log. Before calling any tool, extract from the dbt output:\n"
+    "  - The exact file path (e.g. models/bronze/bronze_data.sql)\n"
+    "  - The line number if present\n"
+    "  - The error message\n\n"
+    "Step 2 — Read the file immediately. If the error references a file path, your very first tool call "
+    "must be read_file on that exact path. Do not call list_directory first.\n\n"
+    "Step 3 — Use list_directory only as a fallback. If the error contains no file path "
+    "(e.g. 'No filter named X', 'Compilation Error', 'macro not found'), then use list_directory "
+    "to locate the relevant macro files before reading them.\n\n"
+    "Step 4 — Propose a minimal, targeted fix. Only address the file(s) mentioned in the error. "
+    "Do not rewrite or modify any file not directly implicated by the error message.\n\n"
+    "Stop as soon as you have read the relevant file(s) and can state a concrete fix."
 )
 
 
@@ -60,25 +59,19 @@ def run():
         f"{json.dumps(error_entry, indent=2)}"
     )
 
-    client = anthropic.Anthropic()
+    llm = LLMClient()
     messages = [{"role": "user", "content": initial_message}]
 
     print("[diagnose] starting tool-use loop")
     tool_call_count = 0
     while True:
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            system=SYSTEM_PROMPT,
-            tools=TOOLS,
-            messages=messages,
-        )
+        stop_reason, content = llm.chat_with_tools(messages, TOOLS, system=SYSTEM_PROMPT)
 
-        messages.append({"role": "assistant", "content": response.content})
+        messages.append({"role": "assistant", "content": content})
 
-        if response.stop_reason == "end_turn":
+        if stop_reason == "end_turn":
             fix_text = ""
-            for block in response.content:
+            for block in content:
                 if hasattr(block, "text"):
                     fix_text += block.text
                     print(block.text)
@@ -94,11 +87,11 @@ def run():
             break
 
         tool_results = []
-        for block in response.content:
+        for block in content:
             if block.type != "tool_use":
                 continue
             tool_call_count += 1
-            print(f"[diagnose] tool: {block.name}")
+            print(f"[diagnose] tool: {block.name} path={block.input}")
             try:
                 output = dispatch(block.name, block.input)
                 is_error = False

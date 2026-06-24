@@ -2,13 +2,12 @@ import os
 import shutil
 import subprocess
 
-import anthropic
 import duckdb
 import yaml
 
+from agent.llm_client import LLMClient
+
 _ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../.."))
-MODEL = "claude-haiku-4-5"
-MAX_TOKENS = 4096
 
 
 def _sandbox_tools():
@@ -59,25 +58,21 @@ def _dispatch_sandbox(name, input_data, sandbox_dir):
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         with open(path, "w") as f:
             f.write(input_data["content"])
+        print(f"[sandbox] write_file: {path}\n--- content ---\n{input_data['content']}\n---------------")
         return f"Written: {path}"
     raise ValueError(f"Unknown tool: {name}")
 
 
-def _agent_loop(client, history, tools, dispatch_fn):
+def _agent_loop(llm, history, tools, dispatch_fn):
     while True:
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            tools=tools,
-            messages=history,
-        )
-        history.append({"role": "assistant", "content": response.content})
+        stop_reason, content = llm.chat_with_tools(history, tools)
+        history.append({"role": "assistant", "content": content})
 
-        if response.stop_reason == "end_turn":
+        if stop_reason == "end_turn":
             break
 
         tool_results = []
-        for block in response.content:
+        for block in content:
             if block.type != "tool_use":
                 continue
             try:
@@ -133,7 +128,7 @@ def _setup_sandbox(sandbox_dir, prod_db_path):
         sandbox_con.close()
 
 
-def _apply_fix(client, fix_suggestion, sandbox_dir, history):
+def _apply_fix(llm, fix_suggestion, sandbox_dir, history):
     history.append({
         "role": "user",
         "content": (
@@ -142,7 +137,7 @@ def _apply_fix(client, fix_suggestion, sandbox_dir, history):
         ),
     })
     _agent_loop(
-        client,
+        llm,
         history,
         _sandbox_tools(),
         lambda name, inp: _dispatch_sandbox(name, inp, sandbox_dir),
@@ -159,17 +154,10 @@ def _run_dbt(sandbox_dir):
     return result.returncode == 0, result.stdout or result.stderr
 
 
-def _get_new_fix(client, history):
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        messages=history,
-    )
-    history.append({"role": "assistant", "content": response.content})
-    for block in response.content:
-        if hasattr(block, "text"):
-            return block.text
-    return ""
+def _get_new_fix(llm, history):
+    text = llm.chat(history)
+    history.append({"role": "assistant", "content": text})
+    return text
 
 
 def run_sandbox_loop(fix_suggestion, error_entry, conversation_history):
@@ -177,7 +165,7 @@ def run_sandbox_loop(fix_suggestion, error_entry, conversation_history):
         db_cfg = yaml.safe_load(f)
     prod_db_path = os.path.join(_ROOT, db_cfg["database"])
 
-    client = anthropic.Anthropic()
+    llm = LLMClient()
     history = list(conversation_history)
     fix_to_apply = fix_suggestion
     last_error = ""
@@ -190,7 +178,7 @@ def run_sandbox_loop(fix_suggestion, error_entry, conversation_history):
             sandbox_dir = os.path.join(sandbox_base, f"attempt_{attempt}")
             _setup_sandbox(sandbox_dir, prod_db_path)
             print("[sandbox] setup complete")
-            _apply_fix(client, fix_to_apply, sandbox_dir, history)
+            _apply_fix(llm, fix_to_apply, sandbox_dir, history)
             print("[sandbox] fix applied")
             success, output = _run_dbt(sandbox_dir)
 
@@ -207,7 +195,7 @@ def run_sandbox_loop(fix_suggestion, error_entry, conversation_history):
                     "Propose a new fix."
                 ),
             })
-            fix_to_apply = _get_new_fix(client, history)
+            fix_to_apply = _get_new_fix(llm, history)
 
         return {"status": "failed", "attempts": 5, "last_error": last_error}
     finally:

@@ -1,1 +1,4 @@
 active: true
+provider: anthropic  # anthropic | openai | google | deepseek | mistral | ollama
+model: claude-haiku-4-5
+base_url:           # only needed for ollama, e.g. http://localhost:11434
